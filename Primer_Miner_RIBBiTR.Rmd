@@ -1,0 +1,91 @@
+---
+title: "PrimerMiner_Amphibs"
+author: "Brandon D. Hoenig"
+date: "2/8/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load Libraries
+```{r}
+library(tidyverse)
+library(taxreturn)
+library(ape)
+library(Biostrings)
+library(aphid)
+```
+
+Download Taxa List
+```{r}
+taxaList <-
+  read_csv('Taxa_List.csv') %>% 
+  select(-Site) %>%
+  unique() %>%
+  mutate(Species.Name = str_replace(Species.Name, pattern = " sp[.].*", replacement = "")) %>% 
+  mutate(Species.Name = str_replace(Species.Name, pattern = " cf[.]", replacement = "")) %>% 
+  mutate(Species.Name.alt = Species.Name) %>% 
+  mutate(Species.Name = str_replace(Species.Name, pattern = "\\s*\\([^\\)]+\\)", "")) %>%
+  mutate(Species.Name.alt = str_replace(Species.Name.alt, pattern = ".*[(]","")) %>% 
+  mutate(Species.Name.alt = str_replace(Species.Name.alt, pattern = '[)]', ""))
+  
+taxaList_clean <-
+  c(taxaList$Species.Name, taxaList$Species.Name.alt) %>%
+    unique()
+```
+
+Fetch Taxa List Seqs from BOLD
+```{r}
+TaxaList_Seqs_bold <-
+fetch_seqs(taxaList_clean, database = 'bold', multithread = F, marker = 'COI-5P', output = 'gb-binom')
+```
+
+Fetch Taxa List Seqs from GenBank
+```{r}
+TaxaList_Seqs_genbank <-
+fetch_seqs(taxaList_clean, database = 'genbank', marker = 'COI[GENE] OR COX1[GENE] OR COXI[GENE]', multithread = F, output = 'gb-binom')
+```
+
+Fetch Taxa Seqs from Mito
+```{r}
+TaxaList_Seqs_mt <-
+fetch_seqs(taxaList_clean, database = 'nuccore', marker = 'mitochondria', multithread = F, output = 'gb-binom')
+```
+
+```{r}
+write_fasta(c(TaxaList_Seqs_bold, TaxaList_Seqs_mt, TaxaList_Seqs_genbank), file = 'TaxaList_Seqs_combined.fasta')
+```
+
+Train Model
+
+Get reference sequences for all amphibians to train our PHMM
+```{r}
+Ref_Seqs_bold <-
+fetch_seqs("Amphibia", database = 'bold', multithread = F, marker = 'COI-5P', output = 'gb-binom')
+
+Ref_Seqs_genbank <-
+fetch_seqs("Amphibia", database = 'genbank', multithread = F, marker = 'COI[GENE] OR COX1[GENE] OR COXI[GENE]', output = 'gb-binom')
+
+Ref_Seqs_mt <-
+fetch_seqs("Amphibia", database = 'nuccore', multithread = F, marker = 'mitochondria', output = 'gb-binom')
+```
+
+Concatenate into a single object 
+```{r}
+Ref_Seqs_concat <-
+concat_DNAbin(Ref_Seqs_bold, Ref_Seqs_mt, Ref_Seqs_genbank)
+```
+
+Write sequences to fasta
+```{r}
+Ref_Seqs_concat_DNAss <-
+DNAbin2DNAstringset(Ref_Seqs_concat)
+
+write_fasta(Ref_Seqs_concat_DNAss, "Amphibian_Reference_Sequences_COI.fasta")
+```
+
+```{r}
+Ref_Seqs_concat_aligned <-
+  aphid::align.DNAbin(Ref_Seqs_concat)
+```
+
