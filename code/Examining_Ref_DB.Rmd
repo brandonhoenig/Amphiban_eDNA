@@ -1,0 +1,89 @@
+---
+title: "Determining_Species_w_DNA"
+author: "Brandon D. Hoenig"
+date: "2/14/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+Load Libraries
+```{r}
+library(tidyverse)
+library(Biostrings)
+library(fuzzyjoin)
+library(taxreturn)
+```
+
+Input Data
+```{r}
+target_seqs <-
+  readDNAStringSet("data/Database_Sequences/Amphibian_Reference_Sequences_COI.fasta")
+
+target_seqs <- 
+  tibble(seq_name = names(target_seqs), 
+         sequence = paste(target_seqs))
+
+target_taxa <-
+  read_csv('data/Taxon_List/Taxa_List.csv')
+
+synonyms <-
+  get_ncbi_synonyms(dir = "data/ncbi_taxdump")
+```
+
+Clean TaxaList
+```{r}
+taxaList <-
+  target_taxa %>%
+  unique() %>%
+  mutate(Species.Name = str_replace(Species.Name, pattern = " sp[.].*", replacement = "")) %>% #removes sp. from genera
+  mutate(Species.Name = str_replace(Species.Name, pattern = " cf[.]", replacement = "")) %>%  #removes cf. from species
+  mutate(Species.Name.alt = Species.Name) %>% # creates second column to handle recently changed species names
+  mutate(Species.Name = str_replace(Species.Name, pattern = "\\s*\\([^\\)]+\\)", "")) %>% #removes alternate names in parenthese
+  mutate(Species.Name.alt = str_replace(Species.Name.alt, pattern = ".*[(]","")) %>% # removes leading paranthese and anything before it (e.g. alternate genus name)
+  mutate(Species.Name.alt = str_replace(Species.Name.alt, pattern = '[)]', "")) %>% #removes trailing parenthese.
+  mutate(Site.2 = Site) %>%
+  unite(Species.Name, Site, sep = ";", col = 'Species.Name') %>%
+  unite(Species.Name.alt, Site.2, sep = ";", col = 'Species.Name.alt')
+  
+taxaList1 <-
+  tibble(taxaList = 
+  c(taxaList$Species.Name, taxaList$Species.Name.alt)) %>% # concats common and alternate latin names. 
+    unique() %>% #removes duplicates.
+    separate(taxaList, sep = ";", into = c("taxa_name", "Site")) %>%
+  separate(taxa_name, into = c('Genus', 'Species'), sep = " ") %>%
+  mutate(Species = if_else(is.na(Species), Genus, Species)) 
+```
+
+
+```{r}
+target_seqs <-
+target_seqs %>%
+  mutate(seq_name = str_replace(seq_name, ".*;", "")) %>%
+  mutate(seq_name = str_replace(seq_name, "_", " ")) 
+
+seqd_taxaListdf <-
+fuzzy_inner_join(target_seqs, taxaList1, by = c("seq_name" = "Species"), match_fun = str_detect) %>%
+  mutate(seq_length = nchar(sequence))  %>%
+  unite(Genus, Species, sep = " ", col = "taxa_name")  %>%
+  left_join(., synonyms, by = c("seq_name" = "tax_name")) %>%
+  filter(str_detect(synonym, taxa_name))  %>%
+  select(seq_name, taxa_name) %>%
+  unique()
+   
+seqd_taxaList <-
+  c(seqd_taxaListdf$seq_name, seqd_taxaListdf$taxa_name) %>% unique()
+
+refd_taxaList <-
+  c(taxaList$Species.Name, taxaList$Species.Name.alt) %>% unique()
+```
+
+
+```{r}
+tibble(
+seqd_taxaList = seqd_taxaList)
+
+tibble(refd_taxaList = refd_taxaList) %>%
+         mutate(refd_taxaList = str_remove(refd_taxaList, pattern = "\\;.*"))
+                
+```
+
