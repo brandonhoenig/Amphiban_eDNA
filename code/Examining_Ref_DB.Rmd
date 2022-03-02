@@ -16,6 +16,7 @@ library(taxreturn)
 
 Input Data
 ```{r}
+#COI Sequences 
 target_seqs <-
   readDNAStringSet("data/Database_Sequences/Amphibian_Reference_Sequences_COI.fasta")
 
@@ -23,11 +24,13 @@ target_seqs <-
   tibble(seq_name = names(target_seqs), 
          sequence = paste(target_seqs))
 
+#list of taxa of interest for our study
 target_taxa <-
   read_csv('data/Taxon_List/Taxa_List.csv')
 
+#synonyms for taxa that changed names
 synonyms <-
-  get_ncbi_synonyms(dir = "data/ncbi_taxdump")
+  read_csv('data/NCBI_synonyms.csv')
 ```
 
 Clean TaxaList
