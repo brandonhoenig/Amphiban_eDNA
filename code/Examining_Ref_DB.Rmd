@@ -12,6 +12,7 @@ library(tidyverse)
 library(Biostrings)
 library(fuzzyjoin)
 library(taxreturn)
+library(aphid)
 ```
 
 Input Data
@@ -20,6 +21,7 @@ Input Data
 target_seqs <-
   readDNAStringSet("data/Database_Sequences/Amphibian_Reference_Sequences_COI.fasta")
 
+#COI Sequences
 target_seqs <- 
   tibble(seq_name = names(target_seqs), 
          sequence = paste(target_seqs))
@@ -33,7 +35,7 @@ synonyms <-
   read_csv('data/NCBI_synonyms.csv')
 ```
 
-Clean TaxaList
+Clean Taxa List
 ```{r}
 taxaList <-
   target_taxa %>%
@@ -89,4 +91,10 @@ tibble(refd_taxaList = refd_taxaList) %>%
          mutate(refd_taxaList = str_remove(refd_taxaList, pattern = "\\;.*"))
                 
 ```
+
+
+```{r}
+
+```
+
 
