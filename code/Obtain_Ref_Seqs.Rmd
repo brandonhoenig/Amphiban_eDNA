@@ -82,5 +82,23 @@ DNAbin2DNAstringset(Ref_Seqs_concat)
 write_fasta(Ref_Seqs_concat_DNAss, "Amphibian_Reference_Sequences_COI.fasta")
 ```
 
+```{r}
+ref_seqs <-
+Ref_Seqs_concat_DNAss 
+
+#Make unique seqs
+ref_seqs_unique <- ref_seqs[!duplicated(str_extract(names(ref_seqs), "^.*\\|" ))]
+
+#resolve synonyms 
+ref_seqs_unique_resolved <-
+resolve_synonyms_ncbi(ref_seqs_unique, 
+                      dir = "data/ncbi_taxdump")
+
+#convert to DNA string set instead of DNA bin
+ref_seqs_DNAss <-
+DNAbin2DNAstringset(ref_seqs_unique_resolved)
+
+write_fasta(ref_seqs_DNAss, "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI.fasta")
+```
 
 
