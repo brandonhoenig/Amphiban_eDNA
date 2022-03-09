@@ -1,0 +1,97 @@
+---
+title: "Determining_Species_w_DNA"
+author: "Brandon D. Hoenig"
+date: "2/14/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+Load Libraries
+```{r}
+library(tidyverse)
+library(Biostrings)
+library(fuzzyjoin)
+library(taxreturn)
+library(aphid)
+library(ape)
+```
+
+Input and Munge Data
+```{r}
+#Input  sequences  
+ref_seqs_DNAss <-
+  readDNAStringSet("data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI.fasta")
+
+#convert to dataframe
+ref_seqs_DNAss_df <- 
+  tibble(seq_name = names(ref_seqs_DNAss), 
+         sequence = paste(ref_seqs_DNAss)) %>%
+  mutate(seq_name = str_replace(seq_name, ".*;", ""), 
+         seq_name = str_replace(seq_name, "_", " "))
+
+#list of taxa of interest for our study
+target_taxa <-
+  read_csv('data/Taxon_List/Taxa_List.csv')
+
+target_taxa_clean <-
+  target_taxa %>%
+  unique() %>%
+  mutate(Species.Name = str_replace(Species.Name, 
+                                    pattern = " sp[.].*", 
+                                    replacement = "")) %>% #removes sp. from genera
+  mutate(Species.Name = str_replace(Species.Name, 
+                                    pattern = " cf[.]", 
+                                    replacement = "")) %>% 
+  mutate(Species.Name = str_replace(Species.Name, 
+                                    pattern = "\\s*\\([^\\)]+\\)", 
+                                    replacement = "")) %>%
+  select(-Site)
+
+#synonyms for taxa that changed names
+synonyms <-
+  read_csv('data/NCBI_synonyms.csv')
+
+synonyms_amphibian <-
+left_join(x = target_taxa_clean  %>%
+            unique(), 
+                  y = synonyms, 
+             by = c("Species.Name" = "synonym")) %>%
+  drop_na() %>% 
+  select("Species.Name" = tax_name)
+```
+
+```{r}
+rbind(
+  
+ref_seqs_DNAss_df %>% # this chunk of code only gets sequences with new names but swaps in old names
+  right_join(., left_join(x = target_taxa_clean  %>%
+            unique(), 
+                  y = synonyms, 
+             by = c("Species.Name" = "synonym")) %>%
+  select(-tax_id) %>%
+  drop_na(), 
+  by = c('seq_name' = 'tax_name')) %>% 
+  select(-seq_name) %>%
+  select(seq_name = Species.Name, sequence) ,
+
+fuzzy_left_join(ref_seqs_DNAss_df, target_taxa_clean, # this chunk gets only new names
+            by = c("seq_name" = "Species.Name"), 
+            match_fun = str_detect) %>% 
+  drop_na(Species.Name) %>%
+  unique() %>%
+  select(seq_name, sequence),
+  
+ fuzzy_left_join(ref_seqs_DNAss_df, synonyms_amphibian, #this chunk gets only old names
+            by = c("seq_name" = "Species.Name"), 
+            match_fun = str_detect) %>%
+  drop_na(Species.Name) %>%
+  unique() %>%
+  select(seq_name, sequence)) %>% 
+  mutate(seq.length = nchar(sequence)) %>%
+  filter(seq.length >=657) %>%
+  select(seq_name) %>%
+  unique() %>%
+  write_csv("data/Taxon_List/species-with-fulllength-coi-Taxa_List.csv")
+  
+```
+
