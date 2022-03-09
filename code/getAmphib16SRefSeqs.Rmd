@@ -1,0 +1,80 @@
+---
+title: "Obtain_Ref_Seqs"
+author: "Brandon D. Hoenig"
+date: "2/8/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load Libraries
+```{r}
+library(tidyverse)
+library(taxreturn)
+library(ape)
+library(Biostrings)
+library(aphid)
+```
+
+Download Taxa List and Clean
+```{r}
+taxaList <-
+  read_csv('data/Taxon_List/Taxa_List.csv') %>% 
+  select(-Site) %>%
+  unique() %>%
+  mutate(Species.Name = str_replace(Species.Name, pattern = " sp[.].*", replacement = "")) %>% #removes sp. from genera
+  mutate(Species.Name = str_replace(Species.Name, pattern = " cf[.]", replacement = "")) %>%  #removes cf. from species
+  mutate(Species.Name.alt = Species.Name) %>% # creates second column to handle recently changed species names
+  mutate(Species.Name = str_replace(Species.Name, pattern = "\\s*\\([^\\)]+\\)", "")) %>% #removes alternate names in parenthese
+  mutate(Species.Name.alt = str_replace(Species.Name.alt, pattern = ".*[(]","")) %>% # removes leading paranthese and anything before it (e.g. alternate genus name)
+  mutate(Species.Name.alt = str_replace(Species.Name.alt, pattern = '[)]', "")) #removes trailing parenthese. 
+  
+taxaList_clean <-
+  c(taxaList$Species.Name, taxaList$Species.Name.alt) %>% # concats common and alternate latin names. 
+    unique() #removes duplicates. 
+```
+
+Get reference sequences for all amphibians to train our PHMM
+```{r}
+
+Ref_Seqs_genbank <-
+fetch_seqs("Amphibia", database = 'genbank', multithread = F, marker = '16S', output = 'gb-binom', db = "data/ncbi_taxdump")
+
+Ref_Seqs_mt <-
+fetch_seqs("Amphibia", database = 'nuccore', multithread = F, marker = 'mitochondria', output = 'gb-binom', db = "data/ncbi_taxdump")
+```
+
+Concatenate into a single object 
+```{r}
+Ref_Seqs_concat <-
+concat_DNAbin(Ref_Seqs_mt, Ref_Seqs_genbank)
+```
+
+Write sequences to fasta
+```{r}
+Ref_Seqs_concat_DNAss <-
+DNAbin2DNAstringset(Ref_Seqs_concat)
+
+write_fasta(Ref_Seqs_concat_DNAss, "Amphibian_Reference_Sequences_16S.fasta")
+```
+
+```{r}
+ref_seqs <-
+Ref_Seqs_concat_DNAss 
+
+#Make unique seqs
+ref_seqs_unique <- ref_seqs[!duplicated(str_extract(names(ref_seqs), "^.*\\|" ))]
+
+#resolve synonyms 
+ref_seqs_unique_resolved <-
+resolve_synonyms_ncbi(ref_seqs_unique, 
+                      dir = "data/ncbi_taxdump")
+
+#convert to DNA string set instead of DNA bin
+ref_seqs_DNAss <-
+DNAbin2DNAstringset(ref_seqs_unique_resolved)
+
+write_fasta(ref_seqs_DNAss, "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_16S.fasta")
+```
+
+
