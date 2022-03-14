@@ -1,0 +1,45 @@
+---
+title: "CO1_Primer_Design"
+author: "Brandon D. Hoenig"
+date: "3/14/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(aphid)
+library(Biostrings)
+library(taxreturn)
+library(ape)
+library(DECIPHER)
+library(seqinr)
+```
+
+```{r}
+seqs_CO1 <-
+readDNAStringSet("data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI.fasta") 
+```
+
+```{r}
+dereplicated_seqs_CO1 <-
+tibble(sequences = paste(seqs_CO1), 
+         names = names(seqs_CO1)) %>%
+  mutate(names = str_replace(names, ".*;", "")) %>%
+  distinct() 
+
+write.fasta(as.list(dereplicated_seqs_CO1$sequences), 
+                    dereplicated_seqs_CO1$names, 
+            file.out = 'data/Database_Sequences/dereplicated_seqs_CO1.fasta')
+
+dereplicated_seqs_CO1 <-
+readDNAStringSet('data/Database_Sequences/dereplicated_seqs_CO1.fasta')
+```
+
+Align Sequences using MAFFT
+```{r}
+
+```
+
+
