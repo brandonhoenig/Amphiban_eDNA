@@ -1,0 +1,137 @@
+---
+title: "Align Sequences, Get Consensus, and Parse Into Files"
+author: "Brandon D. Hoenig"
+date: "3/14/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(aphid)
+library(Biostrings)
+library(taxreturn)
+library(ape)
+library(DECIPHER)
+library(seqinr)
+library(fuzzyjoin)
+library(PrimerMiner)
+library(vegan)
+library(reshape2)
+library(ShortRead)
+```
+
+```{r}
+seqs_CO1 <-
+readDNAStringSet("data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI.fasta") 
+
+species_CO1 <-
+  read_csv('data/Taxon_List/species-with-fulllength-coi-Taxa_List.csv')
+```
+
+```{r}
+dereplicated_seqs_CO1_target_taxa <-
+tibble(sequences = paste(seqs_CO1), 
+         names = names(seqs_CO1)) %>%
+  mutate(names = str_replace(names, ".*;", ""),
+         names = str_replace(names, "_", " ")) %>%
+  distinct() %>% 
+  right_join(., species_CO1, by = c("names" = "seq_name")) %>%
+  rowid_to_column('var') %>%
+  mutate(names = paste(names, var)) %>%
+  mutate(names = str_replace_all(names, " ", "_")) %>%
+  select(-var) %>%
+  mutate(sequences = str_remove_all(sequences, "N")) %>% 
+  drop_na()
+  
+write.fasta(as.list(dereplicated_seqs_CO1_target_taxa$sequences), 
+                    dereplicated_seqs_CO1_target_taxa$names, 
+            file.out = 'data/Database_Sequences/dereplicated_seqs_CO1_target_taxa.fasta')
+
+dereplicated_seqs_CO1_target_taxa <-
+readDNAStringSet('data/Database_Sequences/dereplicated_seqs_CO1_target_taxa.fasta')
+```
+
+Sequences were aligned to Xenopus laevis using MAFFT with default arguments. 
+```{r}
+dereplicated_seqs_CO1_target_taxa_aligned <-
+  readDNAStringSet("data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned.fasta") 
+```
+
+```{r, eval = FALSE}
+unique_names <-
+tibble(
+  sequence_names = dereplicated_seqs_CO1_target_taxa_aligned %>%
+  names()) %>%
+  mutate(sequence_names = str_replace(sequence_names, "_[^_]+$", ""),
+         sequence_names = str_replace(sequence_names, "New[|]", "")) %>%
+  unique() %>%
+  dplyr::slice(-1) # removes xenopus reference
+```
+
+
+```{r, eval = FALSE}
+Lithobates_clamitans_seqs <-
+tibble(names = names(dereplicated_seqs_CO1_target_taxa_aligned),
+       sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
+  mutate(names = str_replace(names, "_[^_]+$", ""),
+         names = str_replace(names, "New[|]", "")) %>%
+  filter(names == "Lithobates_clamitans") 
+
+write.fasta(as.list(Lithobates_clamitans_seqs$sequences), 
+                    Lithobates_clamitans_seqs$names, 
+            file.out = 'data/Database_Sequences/Species_Sequences/Full_Sequences/Lithobates_clamitans_seqs.fasta')
+
+Lithobates_clamitans_seqs_DNAss <- 
+readDNAStringSet('data/Database_Sequences/Species_Sequences/Full_Sequences/Lithobates_clamitans_seqs.fasta')
+
+Lithobates_clamitans_consensus_DNAss_df %>% view() <-
+  tibble(name = "Lithobates_clamitans", 
+         consensus_sequence = paste(ConsensusSequence(Lithobates_clamitans_seqs_DNAss)))
+
+write.fasta(as.list(Lithobates_clamitans_seqs$sequences), 
+                    Lithobates_clamitans_seqs$names, 
+            file.out = 'data/Database_Sequences/Species_Sequences/Consensus_Sequences/Lithobates_clamitans_consesus_seq.fasta', open = 'w')
+```
+
+For Loop to parse out sequences for each species and then get a consensus sequence for each species and have it deposted into its own fasta file. 
+```{r, eval = FALSE}
+
+for (i in 1:length(unique_names$sequence_names))
+  
+{
+
+#Writes a fasta for each species with all sequences from that species in one fasta.
+write.fasta(as.list(assign(paste0(unique_names$sequence_names[i],"_seqs"), # name of R Object
+tibble(names = names(dereplicated_seqs_CO1_target_taxa_aligned),
+       sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
+  mutate(names = str_replace(names, "_[^_]+$", ""),
+         names = str_replace(names, "New[|]", "")) %>%
+  filter(names == paste(unique_names$sequence_names[i])))$sequences), 
+                    assign(paste0(unique_names$sequence_names[i],"_seqs"),
+tibble(names = names(dereplicated_seqs_CO1_target_taxa_aligned),
+       sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
+  mutate(names = str_replace(names, "_[^_]+$", ""),
+         names = str_replace(names, "New[|]", "")) %>%
+  filter(names == paste(unique_names$sequence_names[i])))$names, 
+            file.out = paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"), open = 'w')
+
+  
+#Writes a fasta for each species with the consensus sequence in one fasta file
+  
+write.fasta(as.list(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss_df"),
+  tibble(names = names(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
+readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta")))), 
+         consensus_sequence = paste(ConsensusSequence(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
+readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N", includeTerminalGaps = F))))$consensus_sequence), 
+                    assign(paste0(unique_names$sequence_names[i],"seqs_DNAss_df"),
+  tibble(names = names(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
+readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta")))), 
+         consensus_sequence = paste(ConsensusSequence(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
+readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N", includeTerminalGaps = F))))$names, 
+            file.out = paste0('data/Database_Sequences/Species_Sequences/Consensus_Sequences/', unique_names$sequence_names[i], "_consensus_seq.fasta"), open = 'w')
+
+}
+```
+
