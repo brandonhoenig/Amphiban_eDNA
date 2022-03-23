@@ -1,11 +1,13 @@
 ---
-title: "Align Sequences, Get Consensus, and Parse Into Files"
+title: "Designing CO1 Primers"
 author: "Brandon D. Hoenig"
-date: "3/14/2022"
+date: "3/23/2022"
 output: html_document
-editor_options: 
-  chunk_output_type: console
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
 
 ```{r}
 library(tidyverse)
@@ -22,116 +24,371 @@ library(reshape2)
 library(ShortRead)
 ```
 
-```{r}
-seqs_CO1 <-
-readDNAStringSet("data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI.fasta") 
-
-species_CO1 <-
-  read_csv('data/Taxon_List/species-with-fulllength-coi-Taxa_List.csv')
-```
-
-```{r}
-dereplicated_seqs_CO1_target_taxa <-
-tibble(sequences = paste(seqs_CO1), 
-         names = names(seqs_CO1)) %>%
-  mutate(names = str_replace(names, ".*;", ""),
-         names = str_replace(names, "_", " ")) %>%
-  distinct() %>% 
-  right_join(., species_CO1, by = c("names" = "seq_name")) %>%
-  rowid_to_column('var') %>%
-  mutate(names = paste(names, var)) %>%
-  mutate(names = str_replace_all(names, " ", "_")) %>%
-  select(-var) %>%
-  mutate(sequences = str_remove_all(sequences, "N")) %>% 
-  drop_na()
-  
-write.fasta(as.list(dereplicated_seqs_CO1_target_taxa$sequences), 
-                    dereplicated_seqs_CO1_target_taxa$names, 
-            file.out = 'data/Database_Sequences/dereplicated_seqs_CO1_target_taxa.fasta')
-
-dereplicated_seqs_CO1_target_taxa <-
-readDNAStringSet('data/Database_Sequences/dereplicated_seqs_CO1_target_taxa.fasta')
-```
-
 Sequences were aligned to Xenopus laevis using MAFFT with default arguments. 
 ```{r}
 dereplicated_seqs_CO1_target_taxa_aligned <-
   readDNAStringSet("data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned.fasta") 
 ```
 
-```{r, eval = FALSE}
-unique_names <-
+Remove sequences that were manually determined to not be CO1. 
+```{r}
+list <- 
+  data.frame(name = c(
+names(dereplicated_seqs_CO1_target_taxa_aligned) %>%
+  str_remove(., pattern = "New[|]Desmognathus_fuscus_.*") %>% #Too many were not CO1 so removed all
+  str_remove(., pattern = "New[|]Brachycephalus_nodoterga_120") %>% #CytB
+  str_remove(., pattern = "New[|]Craugastor_gollmeri_1616") %>% # tRNA-met
+  str_remove(., pattern = "New[|]Ambystoma_maculatum_362") %>% # tRNA-Thr
+  str_remove(., pattern = "New[|]Ambystoma_maculatum_363") %>% #tRNA-Thr
+  str_remove(., pattern = "New[|]Lithobates_warszewitschii_117") %>% # NAD1
+  str_remove(., pattern = "New[|]Craugastor_noblei_1615") %>% # tRNA-met
+  str_remove(., pattern = "New[|]Craugastor_bransfordii_1613") %>% # tRNA-met
+  str_remove(., pattern = "New[|]Pristimantis_ridens_1621") %>% #tRNA-met
+  str_remove(., pattern = "New[|]Brachycephalus_pitanga_119") %>% #cytB
+  str_subset(., pattern = ".+")))
+
+dereplicated_seqs_CO1_target_taxa_aligned <-
+  dereplicated_seqs_CO1_target_taxa_aligned[list$name]
+
+writeXStringSet(x = dereplicated_seqs_CO1_target_taxa_aligned, filepath = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", format = 'fasta')
+```
+
+
+```{r}
+
+not_any_na <- function(x) all(!is.na(x))
+
+Primer_plot_eachnucletide_eachgenus <-
 tibble(
-  sequence_names = dereplicated_seqs_CO1_target_taxa_aligned %>%
-  names()) %>%
-  mutate(sequence_names = str_replace(sequence_names, "_[^_]+$", ""),
-         sequence_names = str_replace(sequence_names, "New[|]", "")) %>%
+sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned), 
+names = names(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
+  select(names, sequences) %>% 
+  mutate(names = str_remove(names, pattern = "_[^_]*$"),
+         names = str_remove(names, pattern = "New[|]")) %>% 
+  mutate(site = strsplit(sequences, "")) %>%
+        unnest(site) %>%
+        group_by(sequences) %>%
+        mutate(row = row_number()) %>%
+        spread(row, site) %>%
+  ungroup()  %>%
+  select(-sequences) %>% 
+  pivot_longer(cols = 2:ncol(.), 
+               names_to = "site", 
+               values_to = 'nuc') %>% 
+  mutate(site = as.numeric(site)) %>%
+  filter(nuc == "A"| 
+         nuc == "C"| 
+         nuc == "T"|
+         nuc == 'G')   %>% 
+  group_by(names, site, nuc) %>%
+  tally() %>% 
+  ungroup() %>% 
+  group_by(names, site) %>% 
+  mutate(total = sum(n),
+         perc = n/total) %>%
+  ungroup() %>%
+  drop_na(nuc)
+
+ggplot() +
+  geom_bar(data = Primer_plot_eachnucletide_eachgenus, 
+           aes(x = site, 
+               y = perc,
+               fill = nuc,
+               group = nuc),
+           stat = 'identity') +
+  geom_text(data = Primer_plot_eachnucletide_eachgenus %>%
+              group_by(names) %>%
+              slice_head(n = 1),
+            aes(y = 0.5, 
+                x = -1, 
+                hjust = 1,
+                label = names)) +
+  scale_x_continuous(breaks = seq(1, 652, 1),
+                     position = 'top') +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_cartesian(xlim = c(-5, 652)) +
+  theme_void() +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(colour = 'black',
+                                   angle = 90,
+                                   hjust = 0.5)) +
+  facet_wrap(~names, 
+             ncol = 1)
+  
+ggsave("output/Primer_Plot_eachnucleotide.png", width = 85, height = 50, limitsize = F)
+``` 
+
+Plot for all taxa to see best primers
+```{r}
+Primer_plot_eachnucletide_all <-
+tibble(
+sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned), 
+names = names(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
+  select(names, sequences) %>% 
+  mutate(names = str_remove(names, pattern = "_[^_]*$"),
+         names = str_remove(names, pattern = "New[|]")) %>% 
+  mutate(site = strsplit(sequences, "")) %>%
+        unnest(site) %>%
+        group_by(sequences) %>%
+        mutate(row = row_number()) %>%
+        spread(row, site) %>%
+  ungroup()  %>%
+  select(-sequences) %>% 
+  pivot_longer(cols = 2:ncol(.), 
+               names_to = "site", 
+               values_to = 'nuc') %>% 
+  mutate(site = as.numeric(site)) %>%
+  filter(nuc == "A"| 
+         nuc == "C"| 
+         nuc == "T"|
+         nuc == 'G')   %>% 
+  group_by(site, nuc) %>%
+  tally() %>% 
+  ungroup() %>% 
+  group_by(site) %>% 
+  mutate(total = sum(n),
+         perc = n/total) %>%
+  ungroup() %>%
+  drop_na(nuc) 
+
+
+ggplot() +
+  geom_bar(data = Primer_plot_eachnucletide_all, 
+           aes(x = site, 
+               y = perc,
+               fill = nuc,
+               group = -perc),
+           stat = 'identity') +
+  scale_x_continuous(breaks = seq(1, 652, 1),
+                     position = 'top') +
+  scale_y_continuous(expand = c(0,0)) +
+  coord_cartesian(xlim = c(-5, 652)) +
+  theme_void() +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(colour = 'black',
+                                   angle = 90,
+                                   hjust = 0.5))
+
+ggsave("output/Primer_Plot_eachnucleotide_all.png", width = 85, limitsize = F)
+```
+
+#Gotta make the original primer plot to re-evaluate everything.
+
+
+```{r}
+ggplot() +
+  geom_bar(data = Primer_plot_eachnucletide_all, 
+           aes(x = site, 
+               y = perc,
+               fill = perc,
+               group = -perc),
+           stat = 'identity') +
+  geom_text(data = Primer_plot_eachnucletide_all %>%
+              as.data.frame() %>%
+              arrange(site, -perc)  %>%
+              group_by(site) %>%
+             slice_head(n = 1),
+            aes(x = site, 
+                y = 1.05, 
+                label = nuc,
+                colour = perc)) +
+  scale_fill_binned(breaks = c(seq(0, 1, 0.1)),
+                    type = scale_fill_viridis_c) +
+  scale_colour_binned(breaks = c(seq(0, 1, 0.1)),
+                    type = scale_colour_viridis_c) +
+  scale_x_continuous(breaks = seq(1, 652, 1),
+                     position = 'top') +
+  scale_y_continuous(expand = c(0,0.075)) +
+  coord_cartesian(xlim = c(-5, 652)) +
+  theme_void() +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_text(colour = 'black',
+                                   angle = 90,
+                                   hjust = 1))
+
+ggsave("output/Amp_COI_aligned_new.png", width = 85, limitsize = F)
+```
+
+
+PrimerMiner
+```{r}
+Primer_F1_215_234 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "GCMCCWGAKATRGCHTTYCC",
+                             start = 215, 
+                             stop = 234) %>% 
+  as_tibble()
+
+Primer_F2_247_266 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "TATAAGYTTYTGACTNYTNC",
+                             start = 247, 
+                             stop = 266) %>% 
+  as_tibble()
+
+Primer_R1_470_489 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "TGRTAYTGDGWTATWGAKGG",
+                             start = 470, 
+                             stop = 489, forward = F) %>% 
+  as_tibble()
+
+Primer_R2_587_606 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "AACGTWGTRTTWARRTTNCG",
+                             start = 587, 
+                             stop = 606, forward = F,
+                             save = "output/Primer_R2_587_606.csv") %>% 
+  as_tibble()
+```
+
+```{r}
+rbind(
+Primer_F1_215_234 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", ""))  %>% 
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_F1_215_234"),
+
+Primer_F2_247_266 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ))  %>%
+  mutate(pset = "Primer_F2_247_266"),
+
+Primer_R1_470_489 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_R1_470_489"),
+
+Primer_R2_587_606 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_R2_587_606")
+) %>%
+  pivot_longer(cols = V20:V1, 
+               names_to = 'site', 
+               values_to = 'score') %>%
+  mutate(site = as.numeric(str_remove(site, "V"))) %>%
+  select(site, score, pset,sum) %>%
+  filter(sum > 60) %>%
+  ggplot() +
+  geom_boxplot(aes(x = -site, 
+                   y = score, 
+                   group = site),
+               fill = 'transparent') +
+  facet_wrap(~pset)
+```
+
+```{r}
+rbind(
+Primer_F1_215_234 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", ""))  %>% 
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_F1_215_234"),
+
+Primer_F2_247_266 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ))  %>%
+  mutate(pset = "Primer_F2_247_266"),
+
+Primer_R1_470_489 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_R1_470_489"),
+
+Primer_R2_587_606 %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_R2_587_606")
+) %>%
+  pivot_longer(cols = V20:V1, 
+               names_to = 'site', 
+               values_to = 'score') %>%
+  mutate(site = as.numeric(str_remove(site, "V"))) %>%
+  filter(sum > 60) %>%
+  select(Template, pset) %>% 
   unique() %>%
-  dplyr::slice(-1) # removes xenopus reference
+  group_by(pset) %>%
+  tally()
+```
+
+```{r}
+primer_threshold(fw = "output/Primer_F2_247_266.csv",
+                 rw = "output/Primer_R2_587_606.csv",
+                 file = "output/Primer_F2_248_267-Primer_R2_587_606.csv",
+                 threshold = 120)
 ```
 
 
-```{r, eval = FALSE}
-Lithobates_clamitans_seqs <-
-tibble(names = names(dereplicated_seqs_CO1_target_taxa_aligned),
-       sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
-  mutate(names = str_replace(names, "_[^_]+$", ""),
-         names = str_replace(names, "New[|]", "")) %>%
-  filter(names == "Lithobates_clamitans") 
+```{r}
+derep_Primer_F1_R1 <-
+as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 235, end = 469)))
 
-write.fasta(as.list(Lithobates_clamitans_seqs$sequences), 
-                    Lithobates_clamitans_seqs$names, 
-            file.out = 'data/Database_Sequences/Species_Sequences/Full_Sequences/Lithobates_clamitans_seqs.fasta')
+distF1R1 <-
+melt(dist.dna(derep_Primer_F1_R1, model = 'raw', pairwise.deletion = T, as.matrix = T)) %>%
+  mutate(pset = 'F1R1',
+         value = value * 235)
 
-Lithobates_clamitans_seqs_DNAss <- 
-readDNAStringSet('data/Database_Sequences/Species_Sequences/Full_Sequences/Lithobates_clamitans_seqs.fasta')
+derep_Primer_F1_R2 <-
+as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 235, end = 586)))
 
-Lithobates_clamitans_consensus_DNAss_df %>% view() <-
-  tibble(name = "Lithobates_clamitans", 
-         consensus_sequence = paste(ConsensusSequence(Lithobates_clamitans_seqs_DNAss)))
+distF1R2 <-
+melt(dist.dna(derep_Primer_F1_R2, model = 'raw', pairwise.deletion = T, as.matrix = T))%>%
+  mutate(pset = 'F1R2',
+         value = value * 352)
 
-write.fasta(as.list(Lithobates_clamitans_seqs$sequences), 
-                    Lithobates_clamitans_seqs$names, 
-            file.out = 'data/Database_Sequences/Species_Sequences/Consensus_Sequences/Lithobates_clamitans_consesus_seq.fasta', open = 'w')
+derep_Primer_F2_R1 <-
+as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 267, end = 469)))
+
+distF2R1 <-
+melt(dist.dna(derep_Primer_F2_R1, model = 'raw', pairwise.deletion = T, as.matrix = T))%>%
+  mutate(pset = 'F2R1',
+         value = value * 203)
+
+derep_Primer_F2_R2 <-
+as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 267, end = 586)))
+
+distF2R2 <-
+melt(dist.dna(derep_Primer_F2_R2, model = 'raw', pairwise.deletion = T, as.matrix = T))%>%
+  mutate(pset = 'F2R2',
+         value = value * 320)
 ```
 
-For Loop to parse out sequences for each species and then get a consensus sequence for each species and have it deposted into its own fasta file. 
-```{r, eval = FALSE}
+```{r}
+rbind(distF1R1, distF1R2, distF2R1, distF2R2) %>% 
+  filter(Var1 != Var2) %>% 
+  mutate(Var1 = str_replace(Var1, "_[^_]+$", ""),
+         Var1 = str_replace(Var1, "New[|]", ""),
+         Var2 = str_replace(Var2, "_[^_]+$", ""),
+         Var2 = str_replace(Var2, "New[|]", "")) %>%
+  mutate(variation = if_else(Var1 == Var2, "intra", "inter")) %>% 
+  ggplot() +
+  geom_violin(aes(y = value, 
+                   fill = pset,
+                   x = pset, 
+                   linetype = variation))
 
-for (i in 1:length(unique_names$sequence_names))
-  
-{
-
-#Writes a fasta for each species with all sequences from that species in one fasta.
-write.fasta(as.list(assign(paste0(unique_names$sequence_names[i],"_seqs"), # name of R Object
-tibble(names = names(dereplicated_seqs_CO1_target_taxa_aligned),
-       sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
-  mutate(names = str_replace(names, "_[^_]+$", ""),
-         names = str_replace(names, "New[|]", "")) %>%
-  filter(names == paste(unique_names$sequence_names[i])))$sequences), 
-                    assign(paste0(unique_names$sequence_names[i],"_seqs"),
-tibble(names = names(dereplicated_seqs_CO1_target_taxa_aligned),
-       sequences = paste(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
-  mutate(names = str_replace(names, "_[^_]+$", ""),
-         names = str_replace(names, "New[|]", "")) %>%
-  filter(names == paste(unique_names$sequence_names[i])))$names, 
-            file.out = paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"), open = 'w')
-
-  
-#Writes a fasta for each species with the consensus sequence in one fasta file
-  
-write.fasta(as.list(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss_df"),
-  tibble(names = names(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
-readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta")))), 
-         consensus_sequence = paste(ConsensusSequence(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
-readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N", includeTerminalGaps = F))))$consensus_sequence), 
-                    assign(paste0(unique_names$sequence_names[i],"seqs_DNAss_df"),
-  tibble(names = names(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
-readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta")))), 
-         consensus_sequence = paste(ConsensusSequence(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
-readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N", includeTerminalGaps = F))))$names, 
-            file.out = paste0('data/Database_Sequences/Species_Sequences/Consensus_Sequences/', unique_names$sequence_names[i], "_consensus_seq.fasta"), open = 'w')
-
-}
+ggsave("output/specificDifferencesbyampsize.png")
 ```
+
+```{r}
+distF2R2 %>% 
+  filter(Var1 != Var2) %>% 
+  mutate(Var1 = str_replace(Var1, "_[^_]+$", ""),
+         Var1 = str_replace(Var1, "New[|]", ""),
+         Var2 = str_replace(Var2, "_[^_]+$", ""),
+         Var2 = str_replace(Var2, "New[|]", "")) %>%
+  mutate(variation = if_else(Var1 == Var2, "intra", "inter")) 
+```
+
 
