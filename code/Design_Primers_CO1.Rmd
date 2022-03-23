@@ -1,5 +1,5 @@
 ---
-title: "CO1_Primer_Design"
+title: "Align Sequences, Get Consensus, and Parse Into Files"
 author: "Brandon D. Hoenig"
 date: "3/14/2022"
 output: html_document
@@ -16,7 +16,10 @@ library(ape)
 library(DECIPHER)
 library(seqinr)
 library(fuzzyjoin)
-
+library(PrimerMiner)
+library(vegan)
+library(reshape2)
+library(ShortRead)
 ```
 
 ```{r}
@@ -42,8 +45,6 @@ tibble(sequences = paste(seqs_CO1),
   mutate(sequences = str_remove_all(sequences, "N")) %>% 
   drop_na()
   
-
-
 write.fasta(as.list(dereplicated_seqs_CO1_target_taxa$sequences), 
                     dereplicated_seqs_CO1_target_taxa$names, 
             file.out = 'data/Database_Sequences/dereplicated_seqs_CO1_target_taxa.fasta')
@@ -58,7 +59,7 @@ dereplicated_seqs_CO1_target_taxa_aligned <-
   readDNAStringSet("data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned.fasta") 
 ```
 
-```{r}
+```{r, eval = FALSE}
 unique_names <-
 tibble(
   sequence_names = dereplicated_seqs_CO1_target_taxa_aligned %>%
@@ -123,17 +124,14 @@ write.fasta(as.list(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss_df"
   tibble(names = names(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
 readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta")))), 
          consensus_sequence = paste(ConsensusSequence(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
-readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N"))))$consensus_sequence), 
+readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N", includeTerminalGaps = F))))$consensus_sequence), 
                     assign(paste0(unique_names$sequence_names[i],"seqs_DNAss_df"),
   tibble(names = names(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
 readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta")))), 
          consensus_sequence = paste(ConsensusSequence(assign(paste0(unique_names$sequence_names[i],"seqs_DNAss"), 
-readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N"))))$names, 
+readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequences/', unique_names$sequence_names[i], ".fasta"))),  ignoreNonBases = TRUE, noConsensusChar = "N", includeTerminalGaps = F))))$names, 
             file.out = paste0('data/Database_Sequences/Species_Sequences/Consensus_Sequences/', unique_names$sequence_names[i], "_consensus_seq.fasta"), open = 'w')
 
 }
 ```
-
-
-
 
