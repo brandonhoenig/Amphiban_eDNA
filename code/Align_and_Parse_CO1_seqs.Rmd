@@ -135,3 +135,29 @@ readDNAStringSet(paste0('data/Database_Sequences/Species_Sequences/Full_Sequence
 }
 ```
 
+
+
+#Now for all Amphib sequences!
+
+Sequences were aligned to Xenopus laevis using MAFFT with default arguments. 
+```{r}
+dereplicated_seqs_CO1_all_taxa_aligned <-
+  readDNAStringSet("data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta") 
+
+dereplicated_seqs_CO1_all_taxa_aligned <-
+tibble(names = names(dereplicated_seqs_CO1_all_taxa_aligned),
+       sequences = paste(dereplicated_seqs_CO1_all_taxa_aligned)) %>%
+  mutate(names = str_replace(names, ".*;", "")) %>%
+  rowid_to_column(var = 'rowid') %>%
+  mutate(names = paste(names, rowid, sep = "_")) %>%
+  select(-rowid)
+
+write.fasta(as.list(dereplicated_seqs_CO1_all_taxa_aligned$sequences), 
+                    dereplicated_seqs_CO1_all_taxa_aligned$names,
+            "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta")
+```
+
+
+
+
+

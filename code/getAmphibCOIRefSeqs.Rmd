@@ -40,6 +40,8 @@ Get reference sequences for all amphibians to train our PHMM
 Ref_Seqs_genbank <-
 fetch_seqs("Amphibia", database = 'genbank', multithread = F, marker = 'COI[GENE] OR CO1[GENE] OR COX1[GENE] OR COXI[GENE]', output = 'gb-binom')
 
+
+
 Ref_Seqs_BOLD <-
   fetch_seqs("Amphibia", database = 'bold', multithread = F, marker = 'COI-5P', output = 'gb-binom')
 
@@ -50,7 +52,7 @@ fetch_seqs("Amphibia", database = 'nuccore', multithread = F, marker = 'mitochon
 Concatenate into a single object 
 ```{r}
 Ref_Seqs_concat <-
-concat_DNAbin(Ref_Seqs_mt, Ref_Seqs_genbank)
+concat_DNAbin(Ref_Seqs_mt, Ref_Seqs_BOLD, Ref_Seqs_genbank)
 ```
 
 Write sequences to fasta
@@ -71,7 +73,7 @@ ref_seqs_unique <- ref_seqs[!duplicated(str_extract(names(ref_seqs), "^.*\\|" ))
 #resolve synonyms 
 ref_seqs_unique_resolved <-
 resolve_synonyms_ncbi(ref_seqs_unique, 
-                      dir = "data/ncbi_taxdump")
+                      dir = "ncbi_taxdump")
 
 #convert to DNA string set instead of DNA bin
 ref_seqs_DNAss <-

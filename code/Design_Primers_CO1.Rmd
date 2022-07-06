@@ -53,6 +53,10 @@ dereplicated_seqs_CO1_target_taxa_aligned <-
 writeXStringSet(x = dereplicated_seqs_CO1_target_taxa_aligned, filepath = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", format = 'fasta')
 ```
 
+```{r}
+dereplicated_seqs_CO1_all_taxa_aligned <-
+  readDNAStringSet("data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta") 
+```
 
 ```{r}
 
@@ -143,6 +147,7 @@ names = names(dereplicated_seqs_CO1_target_taxa_aligned)) %>%
          nuc == "C"| 
          nuc == "T"|
          nuc == 'G')   %>% 
+  unique() %>%
   group_by(site, nuc) %>%
   tally() %>% 
   ungroup() %>% 
@@ -171,7 +176,7 @@ ggplot() +
                                    angle = 90,
                                    hjust = 0.5))
 
-ggsave("output/Primer_Plot_eachnucleotide_all.png", width = 85, limitsize = F)
+ggsave("output/Primer_Plot_eachnucleotide_all_test.png", width = 85, limitsize = F)
 ```
 
 #Gotta make the original primer plot to re-evaluate everything.
@@ -194,9 +199,9 @@ ggplot() +
                 y = 1.05, 
                 label = nuc,
                 colour = perc)) +
-  scale_fill_binned(breaks = c(seq(0, 1, 0.1)),
+  scale_fill_binned(breaks = c(seq(0, 1, 0.20)),
                     type = scale_fill_viridis_c) +
-  scale_colour_binned(breaks = c(seq(0, 1, 0.1)),
+  scale_colour_binned(breaks = c(seq(0, 1, 0.20)),
                     type = scale_colour_viridis_c) +
   scale_x_continuous(breaks = seq(1, 652, 1),
                      position = 'top') +
@@ -209,7 +214,15 @@ ggplot() +
                                    angle = 90,
                                    hjust = 1))
 
-ggsave("output/Amp_COI_aligned_new.png", width = 85, limitsize = F)
+ggsave("output/Amp_COI_aligned_new_test.png", width = 85, limitsize = F)
+```
+
+```{r}
+Primer_plot_eachnucletide_all %>%
+              as.data.frame() %>%
+              arrange(site, -perc)  %>%
+              group_by(site) %>%
+             slice_head(n = 1) %>% View()
 ```
 
 
@@ -222,11 +235,11 @@ PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicat
                              stop = 234) %>% 
   as_tibble()
 
-Primer_F2_247_266 <-
+Primer_F2_248_267 <-
 PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
-                             primer_sequ = "TATAAGYTTYTGACTNYTNC",
-                             start = 247, 
-                             stop = 266) %>% 
+                             primer_sequ = "ATAAGYTTYTGACTNYTNCC",
+                             start = 248, 
+                             stop = 267) %>% 
   as_tibble()
 
 Primer_R1_470_489 <-
@@ -240,10 +253,77 @@ Primer_R2_587_606 <-
 PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
                              primer_sequ = "AACGTWGTRTTWARRTTNCG",
                              start = 587, 
-                             stop = 606, forward = F,
-                             save = "output/Primer_R2_587_606.csv") %>% 
+                             stop = 606, forward = F) %>% 
+  as_tibble()
+
+
+
+```
+
+
+
+Testing for off-target effects on Homo sapiens... doesn't look good...
+```{r}
+Primer_F1_215_234_out <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/Homo_sapiens_CO1_outgroup.fasta", 
+                             primer_sequ = "GCMCCWGAKATRGCHTTYCC",
+                             start = 215, 
+                             stop = 234) %>% 
+  as_tibble()
+
+Primer_F2_248_267_out <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/Homo_sapiens_CO1_outgroup.fasta", 
+                             primer_sequ = "ATAAGYTTYTGACTNYTNCC",
+                             start = 248, 
+                             stop = 267) %>% 
+  as_tibble()
+
+Primer_R1_470_489_out <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/Homo_sapiens_CO1_outgroup.fasta", 
+                             primer_sequ = "TGRTAYTGDGWTATWGAKGG",
+                             start = 470, 
+                             stop = 489, forward = F) %>% 
+  as_tibble()
+
+Primer_R2_587_606_out <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/Homo_sapiens_CO1_outgroup.fasta", 
+                             primer_sequ = "AACGTWGTRTTWARRTTNCG",
+                             start = 587, 
+                             stop = 606, forward = F) %>% 
   as_tibble()
 ```
+
+
+```{r}
+Primer_F1_215_234 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "GCMCCWGAKATRGCHTTYCC",
+                             start = 215, 
+                             stop = 234) %>% 
+  as_tibble()
+
+Primer_F2_248_267 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "ATAAGYTTYTGACTNYTNCC",
+                             start = 248, 
+                             stop = 267) %>% 
+  as_tibble()
+
+Primer_R1_470_489 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "TGRTAYTGDGWTATWGAKGG",
+                             start = 470, 
+                             stop = 489, forward = F) %>% 
+  as_tibble()
+
+Primer_R2_587_606 <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/dereplicated_seqs_CO1_target_taxa_aligned_edited.fasta", 
+                             primer_sequ = "AACGTWGTRTTWARRTTNCG",
+                             start = 587, 
+                             stop = 606, forward = F) %>% 
+  as_tibble()
+```
+
 
 ```{r}
 rbind(
@@ -253,11 +333,11 @@ Primer_F1_215_234 %>%
   filter(., !grepl("-", sequ)) %>%
   mutate(pset = "Primer_F1_215_234"),
 
-Primer_F2_247_266 %>%
+Primer_F2_248_267 %>%
   mutate(Template = str_replace(Template, "_[^_]+$", ""),
          Template = str_replace(Template, "New[|]", "")) %>%
   filter(., !grepl("-", sequ))  %>%
-  mutate(pset = "Primer_F2_247_266"),
+  mutate(pset = "Primer_F2_248_267"),
 
 Primer_R1_470_489 %>%
   mutate(Template = str_replace(Template, "_[^_]+$", ""),
@@ -293,11 +373,11 @@ Primer_F1_215_234 %>%
   filter(., !grepl("-", sequ)) %>%
   mutate(pset = "Primer_F1_215_234"),
 
-Primer_F2_247_266 %>%
+Primer_F2_248_267 %>%
   mutate(Template = str_replace(Template, "_[^_]+$", ""),
          Template = str_replace(Template, "New[|]", "")) %>%
   filter(., !grepl("-", sequ))  %>%
-  mutate(pset = "Primer_F2_247_266"),
+  mutate(pset = "Primer_F2_248_267"),
 
 Primer_R1_470_489 %>%
   mutate(Template = str_replace(Template, "_[^_]+$", ""),
@@ -316,16 +396,15 @@ Primer_R2_587_606 %>%
                values_to = 'score') %>%
   mutate(site = as.numeric(str_remove(site, "V"))) %>%
   filter(sum > 60) %>%
-  select(Template, pset) %>% 
-  unique() %>%
-  group_by(pset) %>%
-  tally()
+  filter(pset == "Primer_R2_587_606" |
+         pset == "Primer_F2_247_266") %>% 
+  unique() %>% View()
 ```
 
 ```{r}
-primer_threshold(fw = "output/Primer_F2_247_266.csv",
+
+primer_threshold(fw = "output/Primer_F2_248_267.csv",
                  rw = "output/Primer_R2_587_606.csv",
-                 file = "output/Primer_F2_248_267-Primer_R2_587_606.csv",
                  threshold = 120)
 ```
 
@@ -348,7 +427,7 @@ melt(dist.dna(derep_Primer_F1_R2, model = 'raw', pairwise.deletion = T, as.matri
          value = value * 352)
 
 derep_Primer_F2_R1 <-
-as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 267, end = 469)))
+as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 268, end = 469)))
 
 distF2R1 <-
 melt(dist.dna(derep_Primer_F2_R1, model = 'raw', pairwise.deletion = T, as.matrix = T))%>%
@@ -356,29 +435,12 @@ melt(dist.dna(derep_Primer_F2_R1, model = 'raw', pairwise.deletion = T, as.matri
          value = value * 203)
 
 derep_Primer_F2_R2 <-
-as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 267, end = 586)))
+as.DNAbin(clean(subseq(dereplicated_seqs_CO1_target_taxa_aligned, start = 268, end = 586)))
 
 distF2R2 <-
 melt(dist.dna(derep_Primer_F2_R2, model = 'raw', pairwise.deletion = T, as.matrix = T))%>%
   mutate(pset = 'F2R2',
-         value = value * 320)
-```
-
-```{r}
-rbind(distF1R1, distF1R2, distF2R1, distF2R2) %>% 
-  filter(Var1 != Var2) %>% 
-  mutate(Var1 = str_replace(Var1, "_[^_]+$", ""),
-         Var1 = str_replace(Var1, "New[|]", ""),
-         Var2 = str_replace(Var2, "_[^_]+$", ""),
-         Var2 = str_replace(Var2, "New[|]", "")) %>%
-  mutate(variation = if_else(Var1 == Var2, "intra", "inter")) %>% 
-  ggplot() +
-  geom_violin(aes(y = value, 
-                   fill = pset,
-                   x = pset, 
-                   linetype = variation))
-
-ggsave("output/specificDifferencesbyampsize.png")
+         value = value * 319)
 ```
 
 ```{r}
@@ -388,7 +450,130 @@ distF2R2 %>%
          Var1 = str_replace(Var1, "New[|]", ""),
          Var2 = str_replace(Var2, "_[^_]+$", ""),
          Var2 = str_replace(Var2, "New[|]", "")) %>%
-  mutate(variation = if_else(Var1 == Var2, "intra", "inter")) 
+  mutate(variation = if_else(Var1 == Var2, "intra", "inter"))  %>% 
+  unique() %>% View()
+  ggplot() +
+  geom_violin(aes(y = value, 
+                   fill = pset,
+                   x =  variation))
+
+ggsave("output/specificDifferencesbyampsize.png")
 ```
+
+```{r}
+distF2R2 %>% 
+  filter(!grepl("Xenopus", Var1)) %>%
+  filter(!grepl("Xenopus", Var2)) %>%
+  filter(Var1 != Var2) %>% 
+  mutate(Var1 = str_replace(Var1, "_[^_]+$", ""),
+         Var1 = str_replace(Var1, "New[|]", ""),
+         Var2 = str_replace(Var2, "_[^_]+$", ""),
+         Var2 = str_replace(Var2, "New[|]", "")) %>% 
+  separate(Var2, into = c("Var2_genus", "Var2_species"), sep = "_", extra = 'merge') %>%
+  separate(Var1, into = c("Var1_genus", "Var1_species"), sep = "_", extra = 'merge')
+
+```
+
+
+```{r}
+Primer_F1_215_234_all <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta", 
+                             primer_sequ = "GCMCCWGAKATRGCHTTYCC",
+                             start = 215, 
+                             stop = 234,
+                             save = "output/Primer_F1_215_234_all.csv") %>% 
+  as_tibble()
+
+Primer_F2_248_267_all <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta", 
+                             primer_sequ = "ATAAGYTTYTGACTNYTNCC",
+                             start = 248, 
+                             stop = 267) %>% 
+  as_tibble() # This is the one we're going with. 
+
+Primer_R1_470_489_all <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta", 
+                             primer_sequ = "TGRTAYTGDGWTATWGAKGG",
+                             start = 470, 
+                             stop = 489, forward = F,
+                             save = "output/Primer_R1_470_489_all.csv") %>% 
+  as_tibble()
+
+Primer_R2_587_606_all <-
+PrimerMiner::evaluate_primer(alignment_imp = "data/Database_Sequences/unique_resolved_Amphibian_Reference_Sequences_COI_aligned.fasta", 
+                             primer_sequ = "AACGTWGTRTTWARRTTNCG",
+                             start = 587, 
+                             stop = 606, forward = F) %>% 
+  as_tibble() # this is the one we're going with.
+```
+
+```{r}
+rbind(
+Primer_F2_248_267_all %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ))  %>%
+  mutate(pset = "Primer_F2_248_267"),
+
+Primer_R2_587_606_all %>%
+  mutate(Template = str_replace(Template, "_[^_]+$", ""),
+         Template = str_replace(Template, "New[|]", "")) %>%
+  filter(., !grepl("-", sequ)) %>%
+  mutate(pset = "Primer_R2_587_606")
+) %>%
+  pivot_longer(cols = V20:V1, 
+               names_to = 'site', 
+               values_to = 'score') %>%
+  mutate(site = as.numeric(str_remove(site, "V"))) %>%
+  filter(sum > 60) %>% 
+  unique() %>%
+  ggplot() +
+  geom_boxplot(aes(x = -site, 
+                   y = score, 
+                   group = site),
+               fill = 'transparent') +
+  facet_wrap(~pset)
+```
+
+
+```{r}
+primer_threshold(fw = "output/Primer_F2_248_267_all.csv",
+                 rw = "output/Primer_R2_587_606_all.csv", 
+                 threshold = 120)
+```
+
+
+```{r}
+Primer_R2_587_606_all %>%
+  drop_na(sum) %>%
+  select(Template, sum) %>% 
+  separate(Template, into = c("Species", "ID"), sep = "_(?=[^_]+$)") %>%
+  select(-ID) %>%
+  group_by(Species) %>%
+  summarize_all(c(mean = mean, min = min, max = max, sd = sd)) %>% View() #On average 67% of amphib species amplifiable. 
+```
+
+```{r}
+Primer_F2_248_267_all %>%
+  drop_na(sum) %>%
+  select(Template, sum) %>% 
+  separate(Template, into = c("Species", "ID"), sep = "_(?=[^_]+$)") %>%
+  select(-ID) %>%
+  group_by(Species) %>%
+  summarize_all(c(mean = mean, min = min, max = max, sd = sd)) %>% View() #On average 67% of amphib species amplifiable. 
+```
+
+```{r}
+left_join(Primer_F2_248_267, Primer_R2_587_606, by = "Template",
+          suffix = c("for", "rev")) %>%
+  drop_na(sumrev, sumfor) %>% 
+  mutate(sum = sumrev + sumfor) %>% 
+  separate(Template, into = c("Species", "ID"), sep = "_(?=[^_]+$)") %>% View
+  filter(sum > 120) %>% 
+  select(Species) %>%
+  unique() %>% View()
+```
+
+
 
 
