@@ -1,0 +1,49 @@
+---
+title: "qPCR_Data_8February2023"
+author: "Brandon D. Hoenig"
+date: "2023-02-08"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+```
+
+
+```{r}
+list.files()
+```
+
+```{r}
+Results_6Feb2023 <-
+read_xls(path = '6February2022_eDNA_BdBsal_qPCR_MadrilM.xls', 
+         sheet = 'Results',
+         skip = 42)
+
+ Metadata_6Feb2023 <-
+  read_xlsx("dawson_summer.fall 2022 eDNA data.xlsx",
+           sheet = 'Extraction dates') %>%
+   mutate("(Extraction) ID" = as.character(`(Extraction) ID`))
+```
+
+
+```{r}
+Results_6Feb2023_munged <-
+Results_6Feb2023 %>% # This line reads in the results from 6 Feb 2023 
+  filter(Reporter == 'FAM') %>% # this line filters only for the FAM reporter
+  separate(col = `Sample Name`,
+           into = c("Extraction.Type", "(Extraction) ID"),
+           sep = "_") 
+```
+
+```{r}
+Metadata_6Feb2023 %>%
+  left_join(y = Results_6Feb2023_munged,
+            by = '(Extraction) ID') %>% view()
+```
+
+
+
